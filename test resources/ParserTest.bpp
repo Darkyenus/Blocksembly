@@ -1,0 +1,19 @@
+var foo:u8;
+
+var bar:u8 = 32;
+var baz :s16=32 ;
+
+fun main:u8() {
+	print(schlick, hydrobot);
+	if (bar > baz) {
+		foo = bar;
+	}
+
+	while (boogaloo > (8 - ~42)) {
+		boo = -+-boo;
+	}
+
+	while (a > 0) {
+		c = compatible;
+	}
+}
