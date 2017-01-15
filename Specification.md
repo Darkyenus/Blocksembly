@@ -6,26 +6,26 @@ In pairs, 0 means segment, 1 means offset.
 Combined by concatenation into 16 bit address.
 
 ```
-Code pointer
+Instruction pointer
     RCS
     RCO
 
 General purpose
-000 R0S
-001 R0O
-010 R1S
-011 R1O
-100 R2S
-101 R2O
-110 R3S
-111 R3O
+000 R0S (RG0)
+001 R0O (RG1)
+010 R1S (RG2)
+011 R1O (RG3)
+100 R2S (RG4)
+101 R2O (RG5)
+110 R3S (RG6)
+111 R3O (RG7)
 
 Stack registers
     RSS
     RSO
 
 Flag register
-    RF: Z|S|C|O|U|U|U|U
+    RF: U|U|U|U|O|C|S|Z
         Zero
         Sign
         Carry
@@ -36,22 +36,27 @@ Flag register
 (sorted by opcode)
 
 ```
-LOAD into [RRR] by mem pointed to by [RR]
+LOAD into [R1R] by mem pointed to by [R2R]
     W:  0 - 8 bit load
         1 - 16 bit load
-0000 RRR|RR|W|UU
+0000 R1R|R2R|W|U
+    LOAD8 RRR RRO
+    LOAD16 RRR RRO
 
-STORE from [RRR] into mem pointed to by [RR]
+STORE from [R1R] into mem pointed to by [R2R]
     W:  0 - 8 bit load
         1 - 16 bit load
-0001 RRR|RR|W|UU
+0001 R1R|R2R|W|U
+    STORE8 RRR RRO
+    STORE16 RRR RRO
 
-MOVE from [R] to [R] with transformation (changes flags)
+MOVE to [R1R] from [R2R] with transformation (changes flags)
     TT: 00 - No op (does not change flags)
         01 - Neg
         10 - Complement
         11 - <Reserved>
-0010 RRR|RRR|TT
+0010 R1R|R2R|TT
+    MOVE RRR [-,~]RRR
 
 JUMP (conditional)
     CCC:000 Uncoditional long (RRR points to segment, register RRR+1 is offset)
@@ -61,22 +66,32 @@ JUMP (conditional)
         100 If Carry
         101 If Overflow
         110 If R1 <= R2 | Sign || Zero
-        111 <reserved>
-0011 00CCC|RRR
+        111 Call (like long jump), push return address on stack
+0011 00|CCC|RRR
+    JUMP [LONG] RRR
+    JUMP [IF Z|S|C|O|SZ] RRR
+    CALL RRR
 
 STACK OPERATION
     OO: Operation
-        00 PUSH [RR1] to stack
-        01 POP [RR1] from stack
-        10 SET RSS to RRR
-        11 SET RSO to RRR
-0011 010|OO|RR1
+        00 PUSH [RRR] to stack
+        01 POP [RRR] from stack
+        10 SET RSS to RRR, RSO to RRR+1
+        11 <reserved>
+0011 010|OO|RRR
+    PUSH RRR
+    POP RRR
+    STACK_INIT RRR
+
+RETURN, pop return address (2B, segment+offset), and also pop AAAA (IMM4) bytes from stack (arguments)
+0011 0110|AAAA
+    RETURN [AAAA]
+
+<RESERVED FOR IO>
+0011 0111|O|RRR
 
 <RESERVED>
-0011 011U UUUU
-
-<RESERVED>
-0011 1UUU UUUU
+0011 1UUUUUUU
 
 COMBINE from [R1] and [R2] to [R1] (changes flags)
     0000 - ADD: R1 = R1 + R2
@@ -96,9 +111,21 @@ COMBINE from [R1] and [R2] to [R1] (changes flags)
     1110 - <reserved>
     1111 - <reserved>
 01TT TT|RR1|RR2
+    ADD RRR RRR
+    SUB RRR RRR
+    AND RRR RRR
+    OR RRR RRR
+    XOR RRR RRR
+    ADC RRR RRR
+    SBB RRR RRR
+    SHL RRR RRR
+    SHR RRR RRR
+    SRS RRR RRR
+    CMP RRR RRR
 
 LOAD IMM into [RRR] immediate value [IMM8]
 1RRR IIIIIIII
+    LOADI RRR IIIIIIII
 ```
 
 ## High level

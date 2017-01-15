@@ -32,7 +32,7 @@ abstract class AbstractParser (private val data:CharArray) {
 
     protected fun eof():Boolean = pos >= data.size
 
-    protected fun swallowWhiteSpace() {
+    protected open fun swallowWhiteSpace() {
         while (peek().isWhitespace()) {
             pos++
         }
@@ -96,9 +96,9 @@ abstract class AbstractParser (private val data:CharArray) {
         return (of - lineStart)
     }
 
-    protected fun error(message:String) {
+    protected fun error(message:String, at:Int = pos) {
         errors++
-        System.err.println("\t"+line()+":"+column()+"\t"+message)
+        System.err.println("\t"+line(at)+":"+column(at)+"\t"+message)
     }
 
     override fun toString(): String {
