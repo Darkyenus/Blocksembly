@@ -173,7 +173,11 @@ module blocpu_core();
                 // JUMP
                 if (c_inst[5:3] == 3'b000) begin
                     // Long unconditional
-                    IP <= {RG[c_inst[2:0]], RG[c_inst[2:0] + 1]};
+                    if ({RG[c_inst[2:0]], RG[c_inst[2:0] + 1]} == 16'hFFFF) begin
+                        running <= 0;
+                    end else begin
+                        IP <= {RG[c_inst[2:0]], RG[c_inst[2:0] + 1]};
+                    end
                 end
                 else if (c_inst[5:3] == 3'b001) begin
                     // Short unconditional

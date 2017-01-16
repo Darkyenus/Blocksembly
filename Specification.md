@@ -59,7 +59,7 @@ MOVE to [R1R] from [R2R] with transformation (changes flags)
     MOVE RRR [-,~]RRR
 
 JUMP (conditional)
-    CCC:000 Uncoditional long (RRR points to segment, register RRR+1 is offset)
+    CCC:000 Uncoditional long (RRR points to segment, register RRR+1 is offset) - Jump to FF:FF means HALT
         001 Uncoditional short
         010 If R1 == R2 | Zero
         011 If R1 < R2 | Sign

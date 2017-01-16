@@ -53,6 +53,17 @@ abstract class AbstractParser (private val data:CharArray) {
         }
     }
 
+    protected fun matchWord(what: CharSequence):Boolean {
+        val begin = mark()
+        if(!match(what)) return false
+        if (!eof() && peek().isJavaIdentifierPart()) {
+            //Not a whole word!
+            rollback(begin)
+            return false
+        }
+        return true
+    }
+
     protected fun expect(what: CharSequence, rollbackMark:Int = -1, message: String? = null, swallowWhitespace:Boolean = true):Boolean {
         if (match(what, swallowWhitespace)) {
             return true
@@ -95,6 +106,8 @@ abstract class AbstractParser (private val data:CharArray) {
         }
         return (of - lineStart)
     }
+
+    fun errors():Int = errors
 
     protected fun error(message:String, at:Int = pos) {
         errors++

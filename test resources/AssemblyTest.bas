@@ -1,0 +1,9 @@
+		LOADI R0 42
+loop:   LOADI R1 1
+		SUB R0 R1
+		LOADI R2 loop
+		JUMP IF ZERO R2
+
+end:	LOADI W3 0xFF
+		LOADI W3L 0xFF
+	    JUMP LONG W3

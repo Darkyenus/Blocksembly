@@ -6,19 +6,15 @@ import com.darkyen.blocksembly.AbstractParser
  *
  */
 
-class AssemblyCompiler {
-
-}
-
-enum class GeneralRegister(val altName:String, val wideName:String? = null) {
-    R0S("RG0", "R0"),
-    R0O("RG1"),
-    R1S("RG2", "R1"),
-    R1O("RG3"),
-    R2S("RG4", "R2"),
-    R2O("RG5"),
-    R3S("RG6", "R3"),
-    R3O("RG7");
+enum class GeneralRegister(val wideName:String? = null) {
+    R0("W0"),
+    R1("W0L"),
+    R2("W1"),
+    R3("W1L"),
+    R4("W2"),
+    R5("W2L"),
+    R6("W3"),
+    R7("W3L")
 }
 
 abstract class MachineOperation {
@@ -38,7 +34,8 @@ class InstructionBuilder {
 
     fun lit(width:Int, value:Int): InstructionBuilder {
         if (this.bits + width > 12) throw IllegalArgumentException("Too much bits")
-        if ((1 shl width - 1) and value != value) throw IllegalArgumentException("Value $value won't fit into $width bits")
+        val mask = (1 shl width) - 1
+        if ((mask and value) != value) throw IllegalArgumentException("Value $value won't fit into $width bits")
         this.value = (this.value shl width) or value
         this.bits += width
         return this
@@ -122,14 +119,17 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
     fun parse():List<MachineOperation> {
         while (!eof()) {
             //Parse all labels
-            while (parseLabel()) {}
+            while (parseLabel() != null) {}
 
             //Parse command
+            val preErrors = errors()
             val command = parseCommand()
+            val postErrors = errors()
             if (command != null) {
                 commands.add(command)
             } else {
-                error("Expected command")
+                if (preErrors == postErrors) error("Expected command")
+                while (!eof() && peek() != '\n') next()//Skip to the end of line
             }
         }
 
@@ -165,33 +165,32 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
         }
     }
 
-    private fun parseLabel():Boolean = parse {
-        val labelName = parseWord() ?: return@parse false
-        if (!match(":")) return@parse false
+    private fun parseLabel():String? = parse {
+        val labelName = parseWord() ?: return@parse null
+        if (!match(":")) return@parse null
 
         if (labels.containsKey(labelName)) {
             error("Label redefinition!")
         }
         labels.put(labelName, commands.size)
 
-        return@parse true
-    } ?: false
+        return@parse labelName
+    }
 
     private fun parseWord():String? = parse {
         val first = next()
         if (first.isWhitespace() || first == ':' || first.isDigit()) return@parse null
         val sb = StringBuilder()
         sb.append(first)
-        while (!peek().isWhitespace() || first == ':') {
+        while (!peek().isWhitespace() && peek() != ':') {
             sb.append(next())
         }
         return sb.toString()
     }
 
-    private fun expectRegister(expectMessage:String? = null, wideOnly:Boolean = false): GeneralRegister? = parse {
+    private fun expectRegister(expectMessage:String? = null): GeneralRegister? = parse {
         for (reg in GeneralRegister.values()) {
-            if (wideOnly && reg.wideName == null) continue
-            if (match(reg.name) || match(reg.altName) || (reg.wideName != null && match(reg.wideName))) {
+            if ((reg.wideName != null && matchWord(reg.wideName)) || matchWord(reg.name)) {
                 return@parse reg
             }
         }
@@ -232,24 +231,24 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
     }
 
     private fun parseCommand(): MachineOperation? = parse<MachineOperation> { begin ->
-        if (match("LOAD8")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        if (matchWord("LOAD8") || matchWord("LOAD")) {
+            val targetReg = expectRegister("LOAD8 target register expected") ?: return@parse null
+            val sourceReg = expectRegister("LOAD8 source register expected") ?: return@parse null
             return@parse OperationLOAD(targetReg, sourceReg, false).at(begin)
-        } else if (match("LOAD16")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("LOAD16") || matchWord("LOADW")) {
+            val targetReg = expectRegister("LOAD16 target register expected") ?: return@parse null
+            val sourceReg = expectRegister("LOAD16 source register expected") ?: return@parse null
             return@parse OperationLOAD(targetReg, sourceReg, true).at(begin)
-        } else if (match("STORE8")) {
-            val sourceReg = expectRegister("Source register expected") ?: return@parse null
-            val targetReg = expectRegister("Target register expected", false) ?: return@parse null
+        } else if (matchWord("STORE8") || matchWord("STORE")) {
+            val sourceReg = expectRegister("STORE8 source register expected") ?: return@parse null
+            val targetReg = expectRegister("STORE8 target register expected") ?: return@parse null
             return@parse OperationSTORE(sourceReg, targetReg, false).at(begin)
-        } else if (match("STORE16")) {
-            val sourceReg = expectRegister("Source register expected") ?: return@parse null
-            val targetReg = expectRegister("Target register expected", false) ?: return@parse null
+        } else if (matchWord("STORE16") || matchWord("STOREW")) {
+            val sourceReg = expectRegister("STORE16 source register expected") ?: return@parse null
+            val targetReg = expectRegister("STORE16 target register expected") ?: return@parse null
             return@parse OperationSTORE(sourceReg, targetReg, true).at(begin)
-        } else if (match("MOVE")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
+        } else if (matchWord("MOVE")) {
+            val targetReg = expectRegister("MOVE target register expected") ?: return@parse null
             val transformation: TransformationMOVE
             if (match("-")) {
                 transformation = TransformationMOVE.Complement
@@ -258,112 +257,112 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
             } else {
                 transformation = TransformationMOVE.None
             }
-            val sourceReg = expectRegister("Source register expected") ?: return@parse null
+            val sourceReg = expectRegister("MOVE source register expected") ?: return@parse null
 
             return@parse OperationMOVE(targetReg, sourceReg, transformation).at(begin)
-        } else if (match("JUMP")) {
+        } else if (matchWord("JUMP")) {
             val type: TypeJUMP
-            if (match("LONG")) {
+            if (matchWord("LONG")) {
                 type = TypeJUMP.Long
             } else if (match("IF")) {
-                if (match("Z")) {
+                if (matchWord("ZERO") || matchWord("Z")) {
                     type = TypeJUMP.Zero
-                } else if (match("S")) {
+                } else if (matchWord("SIGN") || matchWord("S")) {
                     type = TypeJUMP.Sign
-                } else if (match("C")) {
+                } else if (matchWord("CARRY") || matchWord("C")) {
                     type = TypeJUMP.Carry
-                } else if (match("O")) {
+                } else if (matchWord("OVERFLOW") || matchWord("O")) {
                     type = TypeJUMP.Overflow
-                } else if (match("SZ")) {
+                } else if (matchWord("SIGN_ZERO") || matchWord("SZ")) {
                     type = TypeJUMP.SignZero
                 } else {
-                    error("Condition expected")
+                    error("JUMP IF: Condition expected")
                     return@parse null
                 }
             } else {
                 type = TypeJUMP.Short
             }
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
+            val targetReg = expectRegister("Jump target register expected") ?: return@parse null
             return@parse OperationJUMP(targetReg, type).at(begin)
-        } else if (match("CALL")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
+        } else if (matchWord("CALL")) {
+            val targetReg = expectRegister("Call target register expected") ?: return@parse null
             return@parse OperationJUMP(targetReg, TypeJUMP.Call).at(begin)
-        } else if (match("PUSH")) {
+        } else if (matchWord("PUSH")) {
             val dataReg = expectRegister("Push register expected") ?: return@parse null
             return@parse OperationSTACK(dataReg, TypeSTACK.Push).at(begin)
-        } else if (match("POP")) {
+        } else if (matchWord("POP")) {
             val dataReg = expectRegister("Pop register expected") ?: return@parse null
             return@parse OperationSTACK(dataReg, TypeSTACK.Pop).at(begin)
-        } else if (match("STACK_INIT")) {
+        } else if (matchWord("STACK_INIT")) {
             val dataReg = expectRegister("Stack init register expected") ?: return@parse null
             return@parse OperationSTACK(dataReg, TypeSTACK.Init).at(begin)
-        } else if (match("RETURN")) {
+        } else if (matchWord("RETURN")) {
             val args = parseNumber()
             if (args == null) {
-                error("Expected amount of argument bytes")
+                error("RETURN: Expected amount of argument bytes")
                 return@parse null
             }
             if (args < 0 || args.toInt().toLong() != args) {
-                error("Invalid amount of argument bytes")
+                error("RETURN: Invalid amount of argument bytes")
                 return@parse null
             }
             return@parse OperationRETURN(args.toInt()).at(begin)
-        } else if (match("ADD")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("ADD")) {
+            val targetReg = expectRegister("ADD target register expected") ?: return@parse null
+            val sourceReg = expectRegister("ADD source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.Add).at(begin)
-        } else if (match("SUB")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("SUB")) {
+            val targetReg = expectRegister("SUB target register expected") ?: return@parse null
+            val sourceReg = expectRegister("SUB source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.Sub).at(begin)
-        } else if (match("AND")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("AND")) {
+            val targetReg = expectRegister("AND target register expected") ?: return@parse null
+            val sourceReg = expectRegister("AND source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.And).at(begin)
-        } else if (match("OR")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("OR")) {
+            val targetReg = expectRegister("OR target register expected") ?: return@parse null
+            val sourceReg = expectRegister("OR source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.Or).at(begin)
-        } else if (match("XOR")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("XOR")) {
+            val targetReg = expectRegister("XOR target register expected") ?: return@parse null
+            val sourceReg = expectRegister("XOR source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.Xor).at(begin)
-        } else if (match("ADC")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("ADC")) {
+            val targetReg = expectRegister("ADC target register expected") ?: return@parse null
+            val sourceReg = expectRegister("ADC source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.AddWithCarry).at(begin)
-        } else if (match("SBB")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("SBB")) {
+            val targetReg = expectRegister("SBB target register expected") ?: return@parse null
+            val sourceReg = expectRegister("SBB source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.SubWithBorrow).at(begin)
-        } else if (match("SHL")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("SHL")) {
+            val targetReg = expectRegister("SHL target register expected") ?: return@parse null
+            val sourceReg = expectRegister("SHL source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.ShiftLeft).at(begin)
-        } else if (match("SHR")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("SHR")) {
+            val targetReg = expectRegister("SHR target register expected") ?: return@parse null
+            val sourceReg = expectRegister("SHR source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.ShiftRight).at(begin)
-        } else if (match("SRS")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("SRS")) {
+            val targetReg = expectRegister("SRS target register expected") ?: return@parse null
+            val sourceReg = expectRegister("SRS source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.ShiftRightWithSignFill).at(begin)
-        } else if (match("CMP")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
-            val sourceReg = expectRegister("Source register expected", true) ?: return@parse null
+        } else if (matchWord("CMP")) {
+            val targetReg = expectRegister("CMP target register expected") ?: return@parse null
+            val sourceReg = expectRegister("CMP source register expected") ?: return@parse null
             return@parse OperationCOMBINE(targetReg, sourceReg, TypeCOMBINE.Compare).at(begin)
-        } else if (match("LOADI")) {
-            val targetReg = expectRegister("Target register expected") ?: return@parse null
+        } else if (matchWord("LOADI")) {
+            val targetReg = expectRegister("LOADI target register expected") ?: return@parse null
             val number = parseNumber()
             if (number == null) {
                 val symbol = parseWord()
                 if (symbol != null) {
                     return@parse OperationSymbolicLOADI(targetReg, symbol).at(begin)
                 }
-                error("Number or symbol expected")
+                error("LOADI: Number or symbol expected")
                 return@parse null
             } else if (number < Byte.MIN_VALUE || number > 256) {
-                error("Number is invalid")
+                error("LOADI: Number is invalid")
                 return@parse null
             }
             return@parse OperationLOADI(targetReg, number.toInt()).at(begin)

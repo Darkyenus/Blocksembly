@@ -54,7 +54,7 @@ class Parser (data:CharArray) : AbstractParser(data) {
 
     fun parseTypeNode():TypeNode? = parse { begin ->
         for (type in ValueType.values()) {
-            if (match(type.name)) {
+            if (matchWord(type.name)) {
                 return@parse TypeNode(begin, mark(), type)
             }
         }
@@ -62,7 +62,7 @@ class Parser (data:CharArray) : AbstractParser(data) {
     }
 
     fun parseVariableDeclaration():VariableDeclarationNode? = parse { begin ->
-        if (!match("var")) return@parse null
+        if (!matchWord("var")) return@parse null
 
         val identifier = parseIdentifier()
         if (identifier == null) {
@@ -116,7 +116,7 @@ class Parser (data:CharArray) : AbstractParser(data) {
     }
 
     fun parseFunctionDeclaration(): FunctionDeclarationNode? = parse { begin ->
-        if (!match("fun")) return@parse null
+        if (!matchWord("fun")) return@parse null
 
         val identifier = parseIdentifier()
         if (identifier == null) {
@@ -204,9 +204,9 @@ class Parser (data:CharArray) : AbstractParser(data) {
     }
 
     fun parseBooleanLiteral(): BooleanLiteralNode? = parse { begin ->
-        if (match("true")) {
+        if (matchWord("true")) {
             return@parse BooleanLiteralNode(begin, mark(), true)
-        } else if (match("false")) {
+        } else if (matchWord("false")) {
             return@parse BooleanLiteralNode(begin, mark(), false)
         } else return@parse null
     }
@@ -328,7 +328,7 @@ class Parser (data:CharArray) : AbstractParser(data) {
     }
 
     fun parseIfStatement(): IfStatementNode? = parse { begin ->
-        if (!match("if")) return@parse null
+        if (!matchWord("if")) return@parse null
 
         if (!expect("(")) return@parse null
 
@@ -344,7 +344,7 @@ class Parser (data:CharArray) : AbstractParser(data) {
 
         var elseStatement:StatementNode? = null
 
-        if (match("else")) {
+        if (matchWord("else")) {
             val elseIf = parseIfStatement()
             if (elseIf != null) {
                 elseStatement = elseIf
@@ -358,7 +358,7 @@ class Parser (data:CharArray) : AbstractParser(data) {
     }
 
     fun parseWhileStatement(): WhileStatementNode? = parse { begin ->
-        if (!match("while")) return@parse null
+        if (!matchWord("while")) return@parse null
 
         if (!expect("(")) return@parse null
 
