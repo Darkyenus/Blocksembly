@@ -6,7 +6,8 @@
 `define DOUBLE_WORD_SIZE [CPU_WIDTH+CPU_WIDTH-1:0]
 `define ADDRESS_SIZE `DOUBLE_WORD_SIZE
 
-module blocpu_core();
+module blocpu_core(input in_running, input in_reset, output out_running, output out_reset, 
+						input [INSTRUCTION_WIDTH-1:0] in_instruction, input [MEMORY_HIGH:0] in_instruction_address, input in_instruction_write);
 
 	parameter CPU_WIDTH = 8;
 	parameter INSTRUCTION_WIDTH = 12;
@@ -32,6 +33,11 @@ module blocpu_core();
 	reg running;
 	reg reset;
 	reg `WORD_SIZE exit_code;
+	
+	always @(posedge in_running) running = in_running;
+	always @(posedge in_reset) reset = in_reset;
+	assign out_running = running;
+	assign out_reset = reset;
 
 	// Used to throw away values, see CMP
 	reg `WORD_SIZE black_hole;
@@ -61,19 +67,25 @@ module blocpu_core();
 		RS <= 0;
 		RF <= 0;
 	end
+	
+	//Programming
+	always @(posedge in_instruction_write) begin
+		instruction_memory[in_instruction_address] <= in_instruction;
+	end
 
-	function flagUpdate;
+	function [CPU_WIDTH-1:0] flagUpdate;
 		input `WORD_SIZE value;
 
 		begin
-			RF[0] = value == 0 ? 1 : 0;
+			RF[0] = value == 0 ? 1'b1 : 1'b0;
 			RF[1] = value[CPU_WIDTH-1];
-			RF[CPU_WIDTH-1:2] = 0; //Zero rest
-            flagUpdate = value;
+			RF[CPU_WIDTH-1:2] = 1'b0; //Zero rest
+         
+			flagUpdate = value;
 		end
 	endfunction
 
-	function flagAdd;
+	function [CPU_WIDTH-1:0] flagAdd;
 		input `WORD_SIZE op1;
 		input `WORD_SIZE op2;
 		input carry;
@@ -82,15 +94,16 @@ module blocpu_core();
 
 		begin
 			full_result = {op1[CPU_WIDTH-1], op1} + {op1[CPU_WIDTH-1], op2} + carry;
-			RF[0] = full_result == 0 ? 1 : 0;
+			RF[0] = full_result == 1'b0 ? 1'b1 : 1'b0;
 			RF[1] = full_result[CPU_WIDTH-1];
 			RF[2] = full_result[CPU_WIDTH];
 			//TODO Overflow
+			
 			flagAdd = full_result[CPU_WIDTH-1:0];
 		end
 	endfunction
 
-	function flagSub;
+	function [CPU_WIDTH-1:0] flagSub;
         input `WORD_SIZE op1;
         input `WORD_SIZE op2;
         input borrow;
@@ -99,10 +112,11 @@ module blocpu_core();
 
         begin
             full_result = {op1[CPU_WIDTH-1], op1} - {op1[CPU_WIDTH-1], op2} - borrow;
-            RF[0] = full_result == 0 ? 1 : 0;
+            RF[0] = full_result == 1'b0 ? 1'b1 : 1'b0;
             RF[1] = full_result[CPU_WIDTH-1];
             RF[2] = full_result[CPU_WIDTH];
             //TODO Overflow?
+				
             flagSub = full_result[CPU_WIDTH-1:0];
         end
     endfunction
@@ -154,17 +168,17 @@ module blocpu_core();
 			else if (c_inst[11:8] == 4'b0010) begin
 				// MOVE
 				if (c_inst[1:0] == 2'b00) begin
-					RG[c_inst[7:5]] <= RG[c_inst[4:3]];
+					RG[c_inst[7:5]] <= RG[c_inst[4:2]];
 				end
 				else if (c_inst[1:0] == 2'b00) begin
-                    RG[c_inst[7:5]] <= flagUpdate(~RG[c_inst[4:3]]);
+                    RG[c_inst[7:5]] <= flagUpdate(~RG[c_inst[4:2]]);
                 end
 				else if (c_inst[1:0] == 2'b00) begin
-                    RG[c_inst[7:5]] <= flagUpdate(-RG[c_inst[4:3]]);
+                    RG[c_inst[7:5]] <= flagUpdate(-RG[c_inst[4:2]]);
                 end
 				else if (c_inst[1:0] == 2'b11) begin
 					`log_debug("Illegal MOV transformation 11 at %H", IP);
-                    RG[c_inst[7:5]] <= RG[c_inst[4:3]];
+                    RG[c_inst[7:5]] <= RG[c_inst[4:2]];
                 end
                 IP <= IP + 1;
 			end
@@ -325,4 +339,4 @@ module blocpu_core();
 
 		end //end main loop
 
-endmodule 
+endmodule
