@@ -28,7 +28,7 @@ Segment register
     RSE
 
 Flag register
-    RF: U|U|U|U|O|C|S|Z
+    RF: -|-|-|-|O|C|S|Z
         Zero
         Sign
         Carry
@@ -42,16 +42,16 @@ Flag register
 LOAD into [R1R] by mem pointed to by [R2R] in segment RSE
     W:  0 - 8 bit load
         1 - 16 bit load
-0000 R1R|R2R|W|U
-    LOAD8 RRR RRO
-    LOAD16 RRR RRO
+0000 R1R|R2R|W|-
+    LOAD8 R1R R2R
+    LOAD16 R1R R2R
 
-STORE from [R1R] into mem pointed to by [R2R] in segment RSE
+STORE into mem pointed to by [R1R] from [R2R] in segment RSE
     W:  0 - 8 bit load
         1 - 16 bit load
-0001 R1R|R2R|W|U
-    STORE8 RRR RRO
-    STORE16 RRR RRO
+0001 R1R|R2R|W|-
+    STORE8 R1R R2R
+    STORE16 R1R R2R
 
 MOVE to [R1R] from [R2R] with transformation (changes flags)
     TT: 00 - No op (does not change flags)
@@ -100,7 +100,7 @@ INPUT VALUE TO [RRR]
     INPUT [RRR]
 
 <RESERVED>
-0011 1UUUUUUU
+0011 1-------
 
 COMBINE from [R1] and [R2] to [R1] (changes flags)
     0000 - ADD: R1 = R1 + R2

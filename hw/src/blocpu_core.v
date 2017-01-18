@@ -1,5 +1,5 @@
-`define log_trace if(1)$display
-`define log_debug if(1)$display
+`define log_trace if(0)$display
+`define log_debug if(0)$display
 `define log_error if(1)$display
 
 `define WORD_SIZE [CPU_WIDTH-1:0]
@@ -154,22 +154,43 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 					RG[c_inst[7:5]] <= data_memory[{RSE, RG[c_inst[4:2]]}];
 					RG[c_inst[7:5]+1] <= data_memory[{RSE, RG[c_inst[4:2]+1]}];
 				end
-				IP <= IP + 1;
+				IP <= toDWord(IP + 1);
 			end
 
 			else if (c_inst[11:8] == 4'b0001) begin
 				// STORE
+
+				`define S8_TA1 {RSE, RG[c_inst[7:5]]}
+                `define S8_TM1 data_memory[`S8_TA1]
+                `define S8_SA1 (c_inst[4:2])
+                `define S8_SR1 RG[`S8_SA1]
+
+                `define S8_TA2 {RSE, toWord(RG[c_inst[7:5]] + 1)}
+                `define S8_TM2 data_memory[`S8_TA2]
+                `define S8_SA2 (c_inst[4:2]+1)
+                `define S8_SR2 RG[`S8_SA2]
+
 				if (c_inst[1] == 0) begin
                     // 8 bit
-                    `log_debug("STORE 8bit R%X => %X@%X", c_inst[7:5], data_memory[{RSE, RG[c_inst[4:2]]}], {RSE, RG[c_inst[4:2]]});
-                    data_memory[{RSE, RG[c_inst[4:2]]}] <= RG[c_inst[7:5]];
+                    `log_debug("STORE8 %X@%X <= %X@R%X", `S8_TM1, `S8_TA1, `S8_SR1, `S8_SA1);
+                    `S8_TM1 <= `S8_SR1;
                 end else begin
                     // 16 bit
-                    `log_debug("STORE 16bit R%X => %X, %X", c_inst[7:5], data_memory[{RSE, RG[c_inst[4:2]]}], data_memory[{RSE, RG[c_inst[4:2]+1]}]);
-                    data_memory[{RSE, RG[c_inst[4:2]]}] <= RG[c_inst[7:5]];
-                    data_memory[{RSE, RG[c_inst[4:2]+1]}] <= RG[c_inst[7:5]+1];
+                    `log_debug("STORE16 (%X,%X)@(%Xm%X) <= (%X,%X)@(R%X,R%X)", `S8_TM1, `S8_TM2, `S8_TA1, `S8_TA2, `S8_SR1, `S8_SR2, `S8_SA1, `S8_SA2);
+                    `S8_TM1 <= `S8_SR1;
+                    `S8_TM2 <= `S8_SR2;
                 end
-                IP <= IP + 1;
+
+                `undef S8_TA1
+                `undef S8_TA2
+                `undef S8_TM1
+                `undef S8_TM2
+                `undef S8_SA1
+                `undef S8_SA2
+                `undef S8_SR1
+                `undef S8_SR2
+
+                IP <= toDWord(IP + 1);
 			end
 
 			else if (c_inst[11:8] == 4'b0010) begin
@@ -187,7 +208,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 					`log_error("Illegal MOV transformation 11 at %X", IP);
                     RG[c_inst[7:5]] <= RG[c_inst[4:2]];
                 end
-                IP <= IP + 1;
+                IP <= toDWord(IP + 1);
 			end
 
 			else if (c_inst[11:6] == 6'b001100) begin
@@ -209,41 +230,41 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                     if (RF[0] == 1)
                         IP[CPU_WIDTH-1:0] <= RG[c_inst[2:0]];
                     else
-                        IP <= IP + 1;
+                        IP <= toDWord(IP + 1);
                 end
 				else if (c_inst[5:3] == 3'b011) begin
                     // If SIGN
                     if (RF[1] == 1)
                         IP[CPU_WIDTH-1:0] <= RG[c_inst[2:0]];
                     else
-                        IP <= IP + 1;
+                        IP <= toDWord(IP + 1);
                 end
 				else if (c_inst[5:3] == 3'b100) begin
                     // If CARRY
                     if (RF[2] == 1)
                         IP[CPU_WIDTH-1:0] <= RG[c_inst[2:0]];
                     else
-                        IP <= IP + 1;
+                        IP <= toDWord(IP + 1);
                 end
 				else if (c_inst[5:3] == 3'b101) begin
                     // If Overflow
                     if (RF[3] == 1)
                         IP[CPU_WIDTH-1:0] <= RG[c_inst[2:0]];
                     else
-                        IP <= IP + 1;
+                        IP <= toDWord(IP + 1);
                 end
 				else if (c_inst[5:3] == 3'b011) begin
                     // If Sign or Zero
                     if (RF[0] == 1 || RF[0] == 1)
                         IP[CPU_WIDTH-1:0] <= RG[c_inst[2:0]];
                     else
-                        IP <= IP + 1;
+                        IP <= toDWord(IP + 1);
                 end
 				else if (c_inst[5:3] == 3'b011) begin
                     // Unconditional CALL
-                    data_memory[RS-1] <= IP[15:8];
-                    data_memory[RS-2] <= IP[7:0];
-                    RS <= RS - 2;
+                    data_memory[toDWord(RS-1)] <= IP[15:8];
+                    data_memory[toDWord(RS-2)] <= IP[7:0];
+                    RS <= toDWord(RS - 2);
                     IP <= {RG[c_inst[2:0]], RG[c_inst[2:0] + 1]};
                 end
             end
@@ -252,29 +273,29 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                 // STACK OP
                 if (c_inst[4:3] == 2'b00) begin
                     // PUSH
-                    `log_debug("PUSH %X (from %X) (RS: %X)", RG[c_inst[2:0]], c_inst[2:0], RS-1);
-                    data_memory[RS-1] <= RG[c_inst[2:0]];
-                    RS <= RS - 1;
-                    IP <= IP + 1;
+                    `log_debug("PUSH %X (from %X) (RS: %X)", RG[c_inst[2:0]], c_inst[2:0], toDWord(RS-1));
+                    data_memory[toDWord(RS-1)] <= RG[c_inst[2:0]];
+                    RS <= toDWord(RS - 1);
+                    IP <= toDWord(IP + 1);
                 end
 				else if (c_inst[4:3] == 2'b01) begin
                     // POP
                     `log_debug("POP %X (to %X) (RS: %X)", data_memory[RS], c_inst[2:0], RS);
                     RG[c_inst[2:0]] <= data_memory[RS];
-                    RS <= RS + 1;
-                    IP <= IP + 1;
+                    RS <= toDWord(RS + 1);
+                    IP <= toDWord(IP + 1);
                 end
 				else if (c_inst[4:3] == 2'b10) begin
                     // INIT STACK POINTER
                     `log_debug("INIT STACK POINTER TO %X from %X", {RG[c_inst[2:0]], RG[c_inst[2:0]+1]}, c_inst[2:0]);
                     RS <= {RG[c_inst[2:0]], RG[c_inst[2:0]+1]};
-                    IP <= IP + 1;
+                    IP <= toDWord(IP + 1);
                 end
 				else if (c_inst[4:3] == 2'b11) begin
                     // INIT SEGMENT POINTER
                     `log_debug("INIT SEGMENT POINTER TO %X from %X", {RG[c_inst[2:0]], RG[c_inst[2:0]+1]}, c_inst[2:0]);
                     RSE <= {RG[c_inst[2:0]], RG[c_inst[2:0]+1]};
-                    IP <= IP + 1;
+                    IP <= toDWord(IP + 1);
                 end
             end
 
@@ -294,7 +315,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 				#1
 				out_output_trigger <= 0;
 
-				IP <= IP + 1;
+				IP <= toDWord(IP + 1);
             end
 
             else if (c_inst[11:3] == 9'b001101110) begin
@@ -302,7 +323,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                 `log_debug("INPUT: %X", in_input);
                 RG[c_inst[2:0]] <= in_input;
 
-                IP <= IP + 1;
+                IP <= toDWord(IP + 1);
             end
 
 			else if (c_inst[11:10] == 2'b01) begin
@@ -354,7 +375,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                 else begin
                     `log_error("Invalid combine parameter %X at %X", c_inst[9:6], IP);
                 end
-                IP <= IP + 1;
+                IP <= toDWord(IP + 1);
             end
 
 			else if (c_inst[11:11] == 1'b1) begin
@@ -362,7 +383,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                 `log_debug("LOADI %X '%X'", c_inst[10:8], c_inst[7:0]);
                 RG[c_inst[10:8]] <= c_inst[7:0];
 
-                IP <= IP + 1;
+                IP <= toDWord(IP + 1);
             end
 
             else begin
@@ -370,7 +391,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                 $dumpfile("test.vcd");
                 $dumpvars(0, blocpu_core);
                 running <= 0;
-                IP <= IP + 1;
+                IP <= toDWord(IP + 1);
             end
 
 		end //end main loop
@@ -387,7 +408,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	function `DOUBLE_WORD_SIZE toDWord;
         input [63:0] i;
         begin
-            toWord = i`DOUBLE_WORD_SIZE;
+            toDWord = i`DOUBLE_WORD_SIZE;
         end
     endfunction
 

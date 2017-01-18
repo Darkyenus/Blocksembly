@@ -63,23 +63,23 @@ class InstructionBuilder {
     }
 }
 
-class OperationLOAD(val register: GeneralRegister, val memory: GeneralRegister, val wide:Boolean) : MachineOperation() {
+class OperationLOAD(val targetRegister: GeneralRegister, val sourceMemory: GeneralRegister, val wide:Boolean) : MachineOperation() {
     override fun machineInstruction(builder: InstructionBuilder) {
-        builder.lit(4, 0b0000).reg(register).reg(memory).lit(1, if (wide) 1 else 0).lit(1,0)
+        builder.lit(4, 0b0000).reg(targetRegister).reg(sourceMemory).lit(1, if (wide) 1 else 0).lit(1,0)
     }
 
     override fun toString(): String {
-        return "LOAD "+register+" "+memory+" "+if(wide) "WIDE" else ""
+        return "LOAD "+ targetRegister +" "+ sourceMemory +" "+if(wide) "WIDE" else ""
     }
 }
 
-class OperationSTORE(val register: GeneralRegister, val memory: GeneralRegister, val wide:Boolean) : MachineOperation() {
+class OperationSTORE(val targetMemory: GeneralRegister, val sourceRegister: GeneralRegister, val wide: Boolean) : MachineOperation() {
     override fun machineInstruction(builder: InstructionBuilder) {
-        builder.lit(4, 0b0001).reg(register).reg(memory).lit(1, if (wide) 1 else 0).lit(1,0)
+        builder.lit(4, 0b0001).reg(targetMemory).reg(sourceRegister).lit(1, if (wide) 1 else 0).lit(1,0)
     }
 
     override fun toString(): String {
-        return "STORE "+register+" "+memory+" "+if(wide) "WIDE" else ""
+        return "STORE "+targetMemory+" "+ sourceRegister +" "+if(wide) "WIDE" else ""
     }
 }
 
@@ -290,13 +290,13 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
             val sourceReg = expectRegister("LOAD16 source register expected") ?: return@parse null
             return@parse OperationLOAD(targetReg, sourceReg, true).at(begin)
         } else if (matchWord("STORE8") || matchWord("STORE")) {
-            val sourceReg = expectRegister("STORE8 source register expected") ?: return@parse null
             val targetReg = expectRegister("STORE8 target register expected") ?: return@parse null
-            return@parse OperationSTORE(sourceReg, targetReg, false).at(begin)
+            val sourceReg = expectRegister("STORE8 source register expected") ?: return@parse null
+            return@parse OperationSTORE(targetReg, sourceReg, false).at(begin)
         } else if (matchWord("STORE16") || matchWord("STOREW")) {
-            val sourceReg = expectRegister("STORE16 source register expected") ?: return@parse null
             val targetReg = expectRegister("STORE16 target register expected") ?: return@parse null
-            return@parse OperationSTORE(sourceReg, targetReg, true).at(begin)
+            val sourceReg = expectRegister("STORE16 source register expected") ?: return@parse null
+            return@parse OperationSTORE(targetReg, sourceReg, true).at(begin)
         } else if (matchWord("MOVE") || matchWord("MOV")) {
             val targetReg = expectRegister("MOVE target register expected") ?: return@parse null
             val transformation: TransformationMOVE
