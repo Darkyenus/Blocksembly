@@ -1,13 +1,16 @@
 `define log_trace if(1)$display
 `define log_debug if(1)$display
-`define log_output if(1)$display
+`define log_error if(1)$display
 
 `define WORD_SIZE [CPU_WIDTH-1:0]
 `define DOUBLE_WORD_SIZE [CPU_WIDTH+CPU_WIDTH-1:0]
 `define ADDRESS_SIZE `DOUBLE_WORD_SIZE
+`define INSTRUCTION_SIZE [INSTRUCTION_WIDTH-1:0]
 
 module blocpu_core(input in_running, input in_reset, output out_running, output out_reset, 
-						input [INSTRUCTION_WIDTH-1:0] in_instruction, input `ADDRESS_SIZE in_instruction_address, input in_instruction_write);
+						input `INSTRUCTION_SIZE in_instruction, input `ADDRESS_SIZE in_instruction_address, input in_instruction_write,
+						output reg `WORD_SIZE out_output, output reg out_output_trigger,
+						input `WORD_SIZE in_input);
 
 	parameter CPU_WIDTH = 8;
 	parameter INSTRUCTION_WIDTH = 12;
@@ -15,8 +18,8 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	
 	parameter CLOCK_RATE = 10;
 	
-	reg [INSTRUCTION_WIDTH-1:0] instruction_memory `ADDRESS_SIZE;
-	reg [CPU_WIDTH-1:0] data_memory `ADDRESS_SIZE;
+	reg `INSTRUCTION_SIZE instruction_memory [(1 << (CPU_WIDTH + CPU_WIDTH))-1:0];
+	reg `WORD_SIZE data_memory [(1 << (CPU_WIDTH + CPU_WIDTH))-1:0];
 
 	// Registers
 	// Instruction pointer
@@ -34,8 +37,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	reg clock;
 	reg running;
 	reg reset;
-	reg `WORD_SIZE exit_code;
-	
+
 	always @(posedge in_running) running = in_running;
 	always @(posedge in_reset) reset = in_reset;
 	assign out_running = running;
@@ -51,7 +53,6 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	always @(posedge reset)begin
 		`log_trace("Initializing core");
 		running <= 0;
-		exit_code <= 0;
 		clock <= 0;
 		system_output <= 0;
 		reset <= 0;
@@ -66,6 +67,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 		RG[5] <= 0;
 		RG[6] <= 0;
 		RG[7] <= 0;
+		RSE <= 0;
 		RS <= 0;
 		RF <= 0;
 	end
@@ -88,7 +90,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 		end
 	endfunction
 
-	function [CPU_WIDTH-1:0] flagAdd;
+	function `WORD_SIZE flagAdd;
 		input `WORD_SIZE op1;
 		input `WORD_SIZE op2;
 		input carry;
@@ -106,7 +108,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 		end
 	endfunction
 
-	function [CPU_WIDTH-1:0] flagSub;
+	function `WORD_SIZE flagSub;
         input `WORD_SIZE op1;
         input `WORD_SIZE op2;
         input borrow;
@@ -127,16 +129,18 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	always #(CLOCK_RATE/2)
 		begin
 			clock <= ~clock;
-			//`log_trace("Clock: %X", clock);
+			`log_trace("Clock: %X", clock);
 		end
 
 	//Current instruction
-	wire [INSTRUCTION_WIDTH-1:0] c_inst;
+	wire `INSTRUCTION_SIZE c_inst;
 	assign c_inst = instruction_memory[IP];
 
 	always @(posedge clock)
 		if (running) begin
 			`log_trace("                             OP %X at %X", c_inst, IP);
+			`log_trace("                             R0: %X R1: %X R2: %X R3: %X R4: %X R5: %X R6: %X R7: %X", RG[0], RG[1], RG[2], RG[3], RG[4], RG[5], RG[6], RG[7]);
+			`log_trace("                             RS+1: %X RS: %X RS-1: %X RS-2: %X", data_memory[RS+1], data_memory[RS], data_memory[RS-1], data_memory[RS-2]);
 
 			if (c_inst[11:8] == 4'b0000) begin
 				// LOAD
@@ -157,7 +161,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 				// STORE
 				if (c_inst[1] == 0) begin
                     // 8 bit
-                    `log_debug("STORE 8bit R%X => %X", c_inst[7:5], data_memory[{RSE, RG[c_inst[4:2]]}]);
+                    `log_debug("STORE 8bit R%X => %X@%X", c_inst[7:5], data_memory[{RSE, RG[c_inst[4:2]]}], {RSE, RG[c_inst[4:2]]});
                     data_memory[{RSE, RG[c_inst[4:2]]}] <= RG[c_inst[7:5]];
                 end else begin
                     // 16 bit
@@ -180,7 +184,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                     RG[c_inst[7:5]] <= flagUpdate(-RG[c_inst[4:2]]);
                 end
 				else if (c_inst[1:0] == 2'b11) begin
-					`log_debug("Illegal MOV transformation 11 at %X", IP);
+					`log_error("Illegal MOV transformation 11 at %X", IP);
                     RG[c_inst[7:5]] <= RG[c_inst[4:2]];
                 end
                 IP <= IP + 1;
@@ -248,32 +252,57 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                 // STACK OP
                 if (c_inst[4:3] == 2'b00) begin
                     // PUSH
+                    `log_debug("PUSH %X (from %X) (RS: %X)", RG[c_inst[2:0]], c_inst[2:0], RS-1);
                     data_memory[RS-1] <= RG[c_inst[2:0]];
                     RS <= RS - 1;
                     IP <= IP + 1;
                 end
 				else if (c_inst[4:3] == 2'b01) begin
                     // POP
+                    `log_debug("POP %X (to %X) (RS: %X)", data_memory[RS], c_inst[2:0], RS);
                     RG[c_inst[2:0]] <= data_memory[RS];
                     RS <= RS + 1;
                     IP <= IP + 1;
                 end
 				else if (c_inst[4:3] == 2'b10) begin
                     // INIT STACK POINTER
+                    `log_debug("INIT STACK POINTER TO %X from %X", {RG[c_inst[2:0]], RG[c_inst[2:0]+1]}, c_inst[2:0]);
                     RS <= {RG[c_inst[2:0]], RG[c_inst[2:0]+1]};
                     IP <= IP + 1;
                 end
 				else if (c_inst[4:3] == 2'b11) begin
-                    // <reserved>
-                    `log_debug("Illegal stack operation 11 at %X", IP);
+                    // INIT SEGMENT POINTER
+                    `log_debug("INIT SEGMENT POINTER TO %X from %X", {RG[c_inst[2:0]], RG[c_inst[2:0]+1]}, c_inst[2:0]);
+                    RSE <= {RG[c_inst[2:0]], RG[c_inst[2:0]+1]};
                     IP <= IP + 1;
                 end
             end
 
 			else if (c_inst[11:4] == 8'b00110110) begin
                 // RETURN
+                `log_debug("RETURN %X (to %X)", c_inst[3:0], {data_memory[RS+1], data_memory[RS]});
                 IP <= {data_memory[RS+1], data_memory[RS]};
                 RS <= RS + 2 + c_inst[3:0];
+            end
+
+            else if (c_inst[11:3] == 9'b001101111) begin
+                // OUTPUT
+                `log_debug("OUTPUT: %X", RG[c_inst[2:0]]);
+				out_output <= RG[c_inst[2:0]];
+				out_output_trigger <= 1;
+				//TODO Turn off the trigger properly?
+				#1
+				out_output_trigger <= 0;
+
+				IP <= IP + 1;
+            end
+
+            else if (c_inst[11:3] == 9'b001101110) begin
+                // INPUT
+                `log_debug("INPUT: %X", in_input);
+                RG[c_inst[2:0]] <= in_input;
+
+                IP <= IP + 1;
             end
 
 			else if (c_inst[11:10] == 2'b01) begin
@@ -323,23 +352,43 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                     black_hole <= flagSub(RG[c_inst[5:3]], RG[c_inst[2:0]], 0);
                 end
                 else begin
-                    `log_debug("Invalid combine parameter %X at %X", c_inst[9:6], IP);
+                    `log_error("Invalid combine parameter %X at %X", c_inst[9:6], IP);
                 end
                 IP <= IP + 1;
             end
 
 			else if (c_inst[11:11] == 1'b1) begin
                 // LOAD IMM8
+                `log_debug("LOADI %X '%X'", c_inst[10:8], c_inst[7:0]);
                 RG[c_inst[10:8]] <= c_inst[7:0];
 
                 IP <= IP + 1;
             end
 
             else begin
-                `log_debug("Invalid instruction %X at %X", c_inst, IP);
+                `log_error("Invalid instruction %X at %X", c_inst, IP);
+                $dumpfile("test.vcd");
+                $dumpvars(0, blocpu_core);
+                running <= 0;
                 IP <= IP + 1;
             end
 
 		end //end main loop
+
+	//Utility functions
+
+	function `WORD_SIZE toWord;
+		input [63:0] i;
+		begin
+			toWord = i`WORD_SIZE;
+		end
+	endfunction
+
+	function `DOUBLE_WORD_SIZE toDWord;
+        input [63:0] i;
+        begin
+            toWord = i`DOUBLE_WORD_SIZE;
+        end
+    endfunction
 
 endmodule

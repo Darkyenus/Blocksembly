@@ -8,7 +8,9 @@ import java.nio.file.Files
  */
 
 fun main(args: Array<String>) {
-    val fileContent = Files.readAllLines(File("AssemblyTest.bas").toPath()).joinToString("\n")
+    val fileName = "MemoryTest.bas"//"Fibonacci.bas"//"AssemblyTest.bas"
+
+    val fileContent = Files.readAllLines(File(fileName).toPath()).joinToString("\n")
     val parser = AssemblyParser(fileContent.toCharArray())
 
     val program = parser.parse()
@@ -16,7 +18,8 @@ fun main(args: Array<String>) {
         return
     }
 
-    val sb = StringBuilder()
+    val sb_verilog = StringBuilder()
+    val sb_debug = StringBuilder()
     val instructionBuilder = InstructionBuilder()
 
     /*
@@ -42,20 +45,28 @@ fun main(args: Array<String>) {
     //in_instruction_write = 1;
 
     for ((i, operation) in program.withIndex()) {
-        sb.append("in_instruction_write = 0;\n")
-        sb.append("in_instruction = 12'b")
+        sb_verilog.append("in_instruction_write = 0; ")
+        sb_verilog.append("in_instruction = 12'b")
         operation.machineInstruction(instructionBuilder)
         val binaryString = Integer.toBinaryString(instructionBuilder.value())
         for (j in 0..(12-binaryString.length)-1) {
-            sb.append("0")
+            sb_verilog.append("0")
         }
-        sb.append(binaryString)
+        sb_verilog.append(binaryString)
         instructionBuilder.clear()
 
-        sb.append(";\n")
-        sb.append("in_instruction_address = ").append(i).append(";\n")
-        sb.append("in_instruction_write = 1;\n#1\n\n")
+        sb_verilog.append(";")
+        sb_verilog.append("in_instruction_address = 16'h").append(Integer.toHexString(i)).append("; ")
+        sb_verilog.append("in_instruction_write = 1; #1 // ").append(operation).append("\n")
+
+        sb_debug.append(i).append("\t").append(operation).append("\n")
     }
 
-    println(sb)
+
+
+    println(sb_verilog)
+    println()
+    println()
+    println()
+    println(sb_debug)
 }

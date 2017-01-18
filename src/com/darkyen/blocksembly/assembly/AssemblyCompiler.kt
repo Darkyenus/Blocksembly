@@ -14,7 +14,11 @@ enum class GeneralRegister(val wideName:String? = null) {
     R4("W2"),
     R5("W2L"),
     R6("W3"),
-    R7("W3L")
+    R7("W3L");
+
+    override fun toString(): String {
+        return name
+    }
 }
 
 abstract class MachineOperation {
@@ -63,11 +67,19 @@ class OperationLOAD(val register: GeneralRegister, val memory: GeneralRegister, 
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(4, 0b0000).reg(register).reg(memory).lit(1, if (wide) 1 else 0).lit(1,0)
     }
+
+    override fun toString(): String {
+        return "LOAD "+register+" "+memory+" "+if(wide) "WIDE" else ""
+    }
 }
 
 class OperationSTORE(val register: GeneralRegister, val memory: GeneralRegister, val wide:Boolean) : MachineOperation() {
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(4, 0b0001).reg(register).reg(memory).lit(1, if (wide) 1 else 0).lit(1,0)
+    }
+
+    override fun toString(): String {
+        return "STORE "+register+" "+memory+" "+if(wide) "WIDE" else ""
     }
 }
 
@@ -76,12 +88,20 @@ class OperationMOVE(val to: GeneralRegister, val from: GeneralRegister, val oper
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(4, 0b0010).reg(to).reg(from).lit(2, operation.ordinal)
     }
+
+    override fun toString(): String {
+        return "MOVE $to $from $operation"
+    }
 }
 
 enum class TypeJUMP {Long, Short, Zero, Sign, Carry, Overflow, SignZero, Call}
 class OperationJUMP(val target: GeneralRegister, val type: TypeJUMP) : MachineOperation() {
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(6, 0b001100).lit(3, type.ordinal).reg(target)
+    }
+
+    override fun toString(): String {
+        return "JUMP $type $target"
     }
 }
 
@@ -90,11 +110,33 @@ class OperationSTACK(val data: GeneralRegister, val type: TypeSTACK) : MachineOp
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(7, 0b0011010).lit(2, type.ordinal).reg(data)
     }
+
+    override fun toString(): String {
+        return "$type $data"
+    }
 }
 
 class OperationRETURN(val arguments:Int) : MachineOperation() {
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(8, 0b00110110).lit(4, arguments)
+    }
+
+    override fun toString(): String {
+        return "RETURN $arguments"
+    }
+}
+
+class OperationIO(val output:Boolean, val register: GeneralRegister) : MachineOperation() {
+    override fun machineInstruction(builder: InstructionBuilder) {
+        builder.lit(8, 0b00110111).lit(1, if (output) 1 else 0).reg(register)
+    }
+
+    override fun toString(): String {
+        if (output) {
+            return "OUTPUT $register"
+        } else {
+            return "INPUT $register"
+        }
     }
 }
 
@@ -103,11 +145,19 @@ class OperationCOMBINE(val target: GeneralRegister, val source: GeneralRegister,
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(2,0b01).lit(4, type.ordinal).reg(target).reg(source)
     }
+
+    override fun toString(): String {
+        return "COMBINE $target $type= $source"
+    }
 }
 
 class OperationLOADI(val target: GeneralRegister, val value:Int) : MachineOperation() {
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(1,0b1).reg(target).lit(8, value)
+    }
+
+    override fun toString(): String {
+        return "LOADI $target $value"
     }
 }
 
@@ -247,7 +297,7 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
             val sourceReg = expectRegister("STORE16 source register expected") ?: return@parse null
             val targetReg = expectRegister("STORE16 target register expected") ?: return@parse null
             return@parse OperationSTORE(sourceReg, targetReg, true).at(begin)
-        } else if (matchWord("MOVE")) {
+        } else if (matchWord("MOVE") || matchWord("MOV")) {
             val targetReg = expectRegister("MOVE target register expected") ?: return@parse null
             val transformation: TransformationMOVE
             if (match("-")) {
@@ -310,6 +360,12 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
                 return@parse null
             }
             return@parse OperationRETURN(args.toInt()).at(begin)
+        } else if (matchWord("OUTPUT")) {
+            val reg = expectRegister("Output register expected") ?: return@parse null
+            return@parse OperationIO(true, reg)
+        } else if (matchWord("INPUT")) {
+            val reg = expectRegister("Input register expected") ?: return@parse null
+            return@parse OperationIO(false, reg)
         } else if (matchWord("ADD")) {
             val targetReg = expectRegister("ADD target register expected") ?: return@parse null
             val sourceReg = expectRegister("ADD source register expected") ?: return@parse null

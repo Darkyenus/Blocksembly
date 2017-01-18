@@ -19,6 +19,7 @@ loop:	# Is 64?
 
 		# It is not
 		ADD R0 R5
+		OUTPUT R0
 		JUMP R4
 
 end:    # End, halt
