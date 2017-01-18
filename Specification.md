@@ -24,6 +24,9 @@ Stack registers
     RSS
     RSO
 
+Segment register
+    RSE
+
 Flag register
     RF: U|U|U|U|O|C|S|Z
         Zero
@@ -36,14 +39,14 @@ Flag register
 (sorted by opcode)
 
 ```
-LOAD into [R1R] by mem pointed to by [R2R]
+LOAD into [R1R] by mem pointed to by [R2R] in segment RSE
     W:  0 - 8 bit load
         1 - 16 bit load
 0000 R1R|R2R|W|U
     LOAD8 RRR RRO
     LOAD16 RRR RRO
 
-STORE from [R1R] into mem pointed to by [R2R]
+STORE from [R1R] into mem pointed to by [R2R] in segment RSE
     W:  0 - 8 bit load
         1 - 16 bit load
 0001 R1R|R2R|W|U
@@ -77,11 +80,12 @@ STACK OPERATION
         00 PUSH [RRR] to stack
         01 POP [RRR] from stack
         10 SET RSS to RRR, RSO to RRR+1
-        11 <reserved>
+        11 SET RSE to RRR
 0011 010|OO|RRR
     PUSH RRR
     POP RRR
     STACK_INIT RRR
+    SEGMENT_INIT RRR
 
 RETURN, pop return address (2B, segment+offset), and also pop AAAA (IMM4) bytes from stack (arguments)
 0011 0110|AAAA

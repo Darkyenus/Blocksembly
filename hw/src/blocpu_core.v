@@ -25,6 +25,8 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	reg `WORD_SIZE RG [7:0];
 	// Stack
 	reg `ADDRESS_SIZE RS;
+	// Segment
+    reg `WORD_SIZE RSE;
 	// Flag
 	reg `WORD_SIZE RF;
 
@@ -140,13 +142,13 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 				// LOAD
 				if (c_inst[1] == 0) begin
 					// 8 bit
-					`log_debug("LOAD 8bit R%X <= %X", c_inst[7:5], data_memory[RG[c_inst[4:2]]]);
-					RG[c_inst[7:5]] <= data_memory[RG[c_inst[4:2]]];
+					`log_debug("LOAD 8bit R%X <= %X", c_inst[7:5], data_memory[{RSE, RG[c_inst[4:2]]}]);
+					RG[c_inst[7:5]] <= data_memory[{RSE, RG[c_inst[4:2]]}];
 				end else begin
 					// 16 bit
-					`log_debug("LOAD 16bit R%X <= %X, %X", c_inst[7:5], data_memory[RG[c_inst[4:2]]], data_memory[RG[c_inst[4:2]] + 1]);
-					RG[c_inst[7:5]] <= data_memory[RG[c_inst[4:2]]];
-					RG[c_inst[7:5]+1] <= data_memory[RG[c_inst[4:2]] + 1];
+					`log_debug("LOAD 16bit R%X <= %X, %X", c_inst[7:5], data_memory[{RSE, RG[c_inst[4:2]]}], data_memory[{RSE, RG[c_inst[4:2]+1]}]);
+					RG[c_inst[7:5]] <= data_memory[{RSE, RG[c_inst[4:2]]}];
+					RG[c_inst[7:5]+1] <= data_memory[{RSE, RG[c_inst[4:2]+1]}];
 				end
 				IP <= IP + 1;
 			end
@@ -155,13 +157,13 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 				// STORE
 				if (c_inst[1] == 0) begin
                     // 8 bit
-                    `log_debug("STORE 8bit R%X => %X", c_inst[7:5], data_memory[RG[c_inst[4:2]]]);
-                    data_memory[RG[c_inst[4:2]]] <= RG[c_inst[7:5]];
+                    `log_debug("STORE 8bit R%X => %X", c_inst[7:5], data_memory[{RSE, RG[c_inst[4:2]]}]);
+                    data_memory[{RSE, RG[c_inst[4:2]]}] <= RG[c_inst[7:5]];
                 end else begin
                     // 16 bit
-                    `log_debug("STORE 16bit R%X => %X, %X", c_inst[7:5], data_memory[RG[c_inst[4:2]]], data_memory[RG[c_inst[4:2]] + 1]);
-                    data_memory[RG[c_inst[4:2]]] <= RG[c_inst[7:5]];
-                    data_memory[RG[c_inst[4:2]] + 1] <= RG[c_inst[7:5]+1];
+                    `log_debug("STORE 16bit R%X => %X, %X", c_inst[7:5], data_memory[{RSE, RG[c_inst[4:2]]}], data_memory[{RSE, RG[c_inst[4:2]+1]}]);
+                    data_memory[{RSE, RG[c_inst[4:2]]}] <= RG[c_inst[7:5]];
+                    data_memory[{RSE, RG[c_inst[4:2]+1]}] <= RG[c_inst[7:5]+1];
                 end
                 IP <= IP + 1;
 			end

@@ -85,7 +85,7 @@ class OperationJUMP(val target: GeneralRegister, val type: TypeJUMP) : MachineOp
     }
 }
 
-enum class TypeSTACK {Push, Pop, Init, _RESERVED_}
+enum class TypeSTACK {Push, Pop, StackInit, SegmentInit}
 class OperationSTACK(val data: GeneralRegister, val type: TypeSTACK) : MachineOperation() {
     override fun machineInstruction(builder: InstructionBuilder) {
         builder.lit(7, 0b0011010).lit(2, type.ordinal).reg(data)
@@ -295,7 +295,10 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
             return@parse OperationSTACK(dataReg, TypeSTACK.Pop).at(begin)
         } else if (matchWord("STACK_INIT")) {
             val dataReg = expectRegister("Stack init register expected") ?: return@parse null
-            return@parse OperationSTACK(dataReg, TypeSTACK.Init).at(begin)
+            return@parse OperationSTACK(dataReg, TypeSTACK.StackInit).at(begin)
+        } else if (matchWord("SEGMENT_INIT")) {
+            val dataReg = expectRegister("Segment init register expected") ?: return@parse null
+            return@parse OperationSTACK(dataReg, TypeSTACK.SegmentInit).at(begin)
         } else if (matchWord("RETURN")) {
             val args = parseNumber()
             if (args == null) {
