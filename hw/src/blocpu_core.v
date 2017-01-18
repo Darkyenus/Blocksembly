@@ -7,16 +7,16 @@
 `define ADDRESS_SIZE `DOUBLE_WORD_SIZE
 
 module blocpu_core(input in_running, input in_reset, output out_running, output out_reset, 
-						input [INSTRUCTION_WIDTH-1:0] in_instruction, input [MEMORY_HIGH:0] in_instruction_address, input in_instruction_write);
+						input [INSTRUCTION_WIDTH-1:0] in_instruction, input `ADDRESS_SIZE in_instruction_address, input in_instruction_write);
 
 	parameter CPU_WIDTH = 8;
 	parameter INSTRUCTION_WIDTH = 12;
-	parameter MEMORY_HIGH = (1 << (CPU_WIDTH+CPU_WIDTH)) - 1;
+	parameter MEMORY_WIDTH = 16;
 	
 	parameter CLOCK_RATE = 10;
 	
-	reg [INSTRUCTION_WIDTH-1:0] instruction_memory [MEMORY_HIGH:0];
-	reg [CPU_WIDTH-1:0] data_memory [MEMORY_HIGH:0];
+	reg [INSTRUCTION_WIDTH-1:0] instruction_memory `ADDRESS_SIZE;
+	reg [CPU_WIDTH-1:0] data_memory `ADDRESS_SIZE;
 
 	// Registers
 	// Instruction pointer
@@ -70,6 +70,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	
 	//Programming
 	always @(posedge in_instruction_write) begin
+		`log_debug("PGM instruction_memory[%X] = %X", in_instruction_address, in_instruction);
 		instruction_memory[in_instruction_address] <= in_instruction;
 	end
 
@@ -124,7 +125,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	always #(CLOCK_RATE/2)
 		begin
 			clock <= ~clock;
-			//`log_trace("Clock: %H", clock);
+			//`log_trace("Clock: %X", clock);
 		end
 
 	//Current instruction
@@ -133,17 +134,17 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 
 	always @(posedge clock)
 		if (running) begin
-			`log_trace("                             OP %H at %H", c_inst, IP);
+			`log_trace("                             OP %X at %X", c_inst, IP);
 
 			if (c_inst[11:8] == 4'b0000) begin
 				// LOAD
 				if (c_inst[1] == 0) begin
 					// 8 bit
-					`log_debug("LOAD 8bit R%H <= %H", c_inst[7:5], data_memory[RG[c_inst[4:2]]]);
+					`log_debug("LOAD 8bit R%X <= %X", c_inst[7:5], data_memory[RG[c_inst[4:2]]]);
 					RG[c_inst[7:5]] <= data_memory[RG[c_inst[4:2]]];
 				end else begin
 					// 16 bit
-					`log_debug("LOAD 16bit R%H <= %H, %H", c_inst[7:5], data_memory[RG[c_inst[4:2]]], data_memory[RG[c_inst[4:2]] + 1]);
+					`log_debug("LOAD 16bit R%X <= %X, %X", c_inst[7:5], data_memory[RG[c_inst[4:2]]], data_memory[RG[c_inst[4:2]] + 1]);
 					RG[c_inst[7:5]] <= data_memory[RG[c_inst[4:2]]];
 					RG[c_inst[7:5]+1] <= data_memory[RG[c_inst[4:2]] + 1];
 				end
@@ -154,11 +155,11 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 				// STORE
 				if (c_inst[1] == 0) begin
                     // 8 bit
-                    `log_debug("STORE 8bit R%H => %H", c_inst[7:5], data_memory[RG[c_inst[4:2]]]);
+                    `log_debug("STORE 8bit R%X => %X", c_inst[7:5], data_memory[RG[c_inst[4:2]]]);
                     data_memory[RG[c_inst[4:2]]] <= RG[c_inst[7:5]];
                 end else begin
                     // 16 bit
-                    `log_debug("STORE 16bit R%H => %H, %H", c_inst[7:5], data_memory[RG[c_inst[4:2]]], data_memory[RG[c_inst[4:2]] + 1]);
+                    `log_debug("STORE 16bit R%X => %X, %X", c_inst[7:5], data_memory[RG[c_inst[4:2]]], data_memory[RG[c_inst[4:2]] + 1]);
                     data_memory[RG[c_inst[4:2]]] <= RG[c_inst[7:5]];
                     data_memory[RG[c_inst[4:2]] + 1] <= RG[c_inst[7:5]+1];
                 end
@@ -177,7 +178,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                     RG[c_inst[7:5]] <= flagUpdate(-RG[c_inst[4:2]]);
                 end
 				else if (c_inst[1:0] == 2'b11) begin
-					`log_debug("Illegal MOV transformation 11 at %H", IP);
+					`log_debug("Illegal MOV transformation 11 at %X", IP);
                     RG[c_inst[7:5]] <= RG[c_inst[4:2]];
                 end
                 IP <= IP + 1;
@@ -262,7 +263,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                 end
 				else if (c_inst[4:3] == 2'b11) begin
                     // <reserved>
-                    `log_debug("Illegal stack operation 11 at %H", IP);
+                    `log_debug("Illegal stack operation 11 at %X", IP);
                     IP <= IP + 1;
                 end
             end
@@ -320,7 +321,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                     black_hole <= flagSub(RG[c_inst[5:3]], RG[c_inst[2:0]], 0);
                 end
                 else begin
-                    `log_debug("Invalid combine parameter %H at %H", c_inst[9:6], IP);
+                    `log_debug("Invalid combine parameter %X at %X", c_inst[9:6], IP);
                 end
                 IP <= IP + 1;
             end
@@ -333,7 +334,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
             end
 
             else begin
-                `log_debug("Invalid instruction %H at %H", c_inst, IP);
+                `log_debug("Invalid instruction %X at %X", c_inst, IP);
                 IP <= IP + 1;
             end
 
