@@ -167,6 +167,7 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
     private val labels = mutableMapOf<String, Int>()
 
     fun parse():List<MachineOperation> {
+        swallowWhiteSpace()
         while (!eof()) {
             //Parse all labels
             while (parseLabel() != null) {}
@@ -181,6 +182,7 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
                 if (preErrors == postErrors) error("Expected command")
                 while (!eof() && peek() != '\n') next()//Skip to the end of line
             }
+            swallowWhiteSpace()
         }
 
         //All commands parsed, resolve symbols
@@ -228,6 +230,7 @@ class AssemblyParser(data:CharArray) : AbstractParser(data) {
     }
 
     private fun parseWord():String? = parse {
+        if (eof()) return@parse null
         val first = next()
         if (first.isWhitespace() || first == ':' || first.isDigit()) return@parse null
         val sb = StringBuilder()

@@ -8,7 +8,7 @@ import java.nio.file.Files
  */
 
 fun main(args: Array<String>) {
-    val fileName = "MemoryTest.bas"//"Fibonacci.bas"//"AssemblyTest.bas"
+    val fileName = "ButtonTest.bas"//"MemoryTest.bas"//"Fibonacci.bas"//"AssemblyTest.bas"
 
     val fileContent = Files.readAllLines(File(fileName).toPath()).joinToString("\n")
     val parser = AssemblyParser(fileContent.toCharArray())
