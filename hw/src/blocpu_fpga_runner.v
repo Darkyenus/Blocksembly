@@ -32,6 +32,8 @@ module blocpu_fpga_runner(
 	output [17:0]	LEDR;
 	output [6:0] HEX0;
 
+	reg [7:0] CPU_OUTPUT_LEDS;
+	
 	reg in_running;
 	reg in_reset;
 	wire out_running;
@@ -41,8 +43,8 @@ module blocpu_fpga_runner(
 	reg in_instruction_write;
 
 	wire [7:0] out_output;
-    wire out_output_trigger;
-    reg [7:0] in_input;
+	wire out_output_trigger;
+	reg [7:0] in_input;
 
 	blocpu_core core (in_running, in_reset, out_running, out_reset,
 						in_instruction, in_instruction_address, in_instruction_write,
@@ -67,15 +69,16 @@ module blocpu_fpga_runner(
         in_instruction_write = 0; in_instruction = 12'b001100001110;in_instruction_address = 16'hc; in_instruction_write = 1; #1 // JUMP Short R6
         in_instruction_write = 0; in_instruction = 12'b111011111111;in_instruction_address = 16'hd; in_instruction_write = 1; #1 // LOADI R6 255
         in_instruction_write = 0; in_instruction = 12'b111111111111;in_instruction_address = 16'he; in_instruction_write = 1; #1 // LOADI R7 255
-        in_instruction_write = 0; in_instruction = 12'b001100000110;in_instruction_address = 16'hf; in_instruction_write = 1; #1 // JUMP Long R6
+        in_instruction_write = 0; in_instruction = 12'b001100000110;in_instruction_address = 16'hf; in_instruction_write = 1; // JUMP Long R6
 		//Instruction end
 	end
 	
 	always @(negedge KEY[1]) in_running <= 1;
 	
 	assign LEDG[8] = out_running;
-	always @(posedge out_output_trigger) LEDG[7:0] = out_output;
+	assign LEDG[7:0] = CPU_OUTPUT_LEDS[7:0];
+	always @(posedge out_output_trigger) CPU_OUTPUT_LEDS[7:0] = out_output;
 
-	assign in_input[3:0] = KEY[3:0];
+	always in_input[3:0] = KEY[3:0];
 
 endmodule

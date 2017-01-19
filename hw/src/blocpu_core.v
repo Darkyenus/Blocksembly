@@ -46,15 +46,11 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 	// Used to throw away values, see CMP
 	reg `WORD_SIZE black_hole;
 
-	// Out
-	reg `WORD_SIZE system_output;
-
 	// Reset
 	always @(posedge reset)begin
 		`log_trace("Initializing core");
 		running <= 0;
 		clock <= 0;
-		system_output <= 0;
 		reset <= 0;
 
 		//Registers
@@ -294,7 +290,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
 				else if (c_inst[4:3] == 2'b11) begin
                     // INIT SEGMENT POINTER
                     `log_debug("INIT SEGMENT POINTER TO %X from %X", {RG[c_inst[2:0]], RG[c_inst[2:0]+1]}, c_inst[2:0]);
-                    RSE <= {RG[c_inst[2:0]], RG[c_inst[2:0]+1]};
+                    RSE <= RG[c_inst[2:0]];
                     IP <= toDWord(IP + 1);
                 end
             end
@@ -303,7 +299,7 @@ module blocpu_core(input in_running, input in_reset, output out_running, output 
                 // RETURN
                 `log_debug("RETURN %X (to %X)", c_inst[3:0], {data_memory[RS+1], data_memory[RS]});
                 IP <= {data_memory[RS+1], data_memory[RS]};
-                RS <= RS + 2 + c_inst[3:0];
+                RS <= toDWord(RS + 2 + c_inst[3:0]);
             end
 
             else if (c_inst[11:3] == 9'b001101111) begin
