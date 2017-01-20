@@ -2,15 +2,16 @@
 
 ## Registers
 
-In pairs, 0 means segment, 1 means offset.
-Combined by concatenation into 16 bit address.
+Some registers come in pairs, suffix S means segment, O means offset.
+Registers with suffix E are 16-bit, others are 8-bit.
+8-bit registers are often combined by concatenation into 16 bit address.
 
 ```
 Instruction pointer
     RCS
     RCO
 
-General purpose
+General purpose (directly accessible by most instructions)
 000 R0S (RG0)
 001 R0O (RG1)
 010 R1S (RG2)
